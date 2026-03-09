@@ -632,7 +632,9 @@ impl QueryRouter {
                 assert!(i.partitioned.is_none());
                 assert!(i.after_columns.is_empty());
 
-                Self::process_table(&i.table_name, &mut table_names);
+                if let sqlparser::ast::TableObject::TableName(table_name) = &i.table {
+                    Self::process_table(table_name, &mut table_names);
+                }
                 if let Some(source) = &i.source {
                     Self::process_query(source, &mut exprs, &mut table_names, &Some(&i.columns));
                 }
@@ -654,20 +656,19 @@ impl QueryRouter {
                 }
                 Self::process_selection(&d.selection, &mut exprs);
             }
-            Update {
-                table,
-                assignments,
-                from,
-                selection,
-                returning: _,
-            } => {
-                Self::process_table_with_join(table, &mut exprs, &mut table_names);
-                if let Some(from_tbl) = from {
-                    Self::process_table_with_join(from_tbl, &mut exprs, &mut table_names);
+            Update(u) => {
+                Self::process_table_with_join(&u.table, &mut exprs, &mut table_names);
+                if let Some(from_tbl) = &u.from {
+                    match from_tbl {
+                        sqlparser::ast::UpdateTableFromKind::BeforeSet(from_tables)
+                        | sqlparser::ast::UpdateTableFromKind::AfterSet(from_tables) => {
+                            Self::process_tables_with_join(from_tables, &mut exprs, &mut table_names);
+                        }
+                    }
                 }
-                Self::process_selection(selection, &mut exprs);
+                Self::process_selection(&u.selection, &mut exprs);
 
-                assignments_opt = Some(assignments);
+                assignments_opt = Some(&u.assignments);
             }
             _ => return None,
         };
@@ -801,7 +802,10 @@ impl QueryRouter {
     }
 
     fn process_table(name: &sqlparser::ast::ObjectName, table_names: &mut Vec<Vec<Ident>>) {
-        table_names.push(name.0.clone())
+        let idents: Vec<Ident> = name.0.iter().filter_map(|part| part.as_ident().cloned()).collect();
+        if !idents.is_empty() {
+            table_names.push(idents);
+        }
     }
 
     /// Parse the shard number from the Bind message
@@ -1060,28 +1064,30 @@ impl QueryRouter {
 
             match &**right {
                 Expr::BinaryOp { .. } => result.extend(self.selection_parser(right, table_names)),
-                Expr::Value(Value::Number(value, ..)) => {
-                    if found {
-                        match value.parse::<i64>() {
-                            Ok(value) => result.push(ShardingKey::Value(value)),
-                            Err(_) => {
-                                debug!("Sharding key was not an integer: {}", value);
-                            }
-                        };
-                    }
-                }
-
-                Expr::Value(Value::Placeholder(placeholder)) => {
-                    match placeholder.replace('$', "").parse::<i16>() {
-                        Ok(placeholder) => result.push(ShardingKey::Placeholder(placeholder)),
-                        Err(_) => {
-                            debug!(
-                                "Prepared statement didn't have integer placeholders: {}",
-                                placeholder
-                            );
+                Expr::Value(value_with_span) => match &value_with_span.value {
+                    Value::Number(value, ..) => {
+                        if found {
+                            match value.parse::<i64>() {
+                                Ok(value) => result.push(ShardingKey::Value(value)),
+                                Err(_) => {
+                                    debug!("Sharding key was not an integer: {}", value);
+                                }
+                            };
                         }
                     }
-                }
+                    Value::Placeholder(placeholder) => {
+                        match placeholder.replace('$', "").parse::<i16>() {
+                            Ok(placeholder) => result.push(ShardingKey::Placeholder(placeholder)),
+                            Err(_) => {
+                                debug!(
+                                    "Prepared statement didn't have integer placeholders: {}",
+                                    placeholder
+                                );
+                            }
+                        }
+                    }
+                    _ => (),
+                },
                 _ => (),
             };
         }
