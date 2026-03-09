@@ -1,8 +1,8 @@
-FROM rust:1.81.0-slim-bookworm 
+FROM rust:1.88.0-slim-trixie
 
 COPY --from=sclevine/yj /bin/yj /bin/yj
 RUN /bin/yj -h
-RUN apt-get update && apt-get install llvm-11 psmisc postgresql-contrib postgresql-client ruby ruby-dev libpq-dev python3 python3-pip lcov curl sudo iproute2 -y
+RUN apt-get update && apt-get install wget llvm-19 psmisc postgresql-contrib postgresql-client ruby ruby-dev libpq-dev python3 python3-pip lcov curl sudo iproute2 -y
 RUN cargo install cargo-binutils rustfilt
 RUN rustup component add llvm-tools-preview
 RUN sudo gem install bundler

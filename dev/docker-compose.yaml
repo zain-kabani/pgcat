@@ -1,5 +1,3 @@
-version: "3"
-
 x-common-definition-pg:
   &common-definition-pg
   image: postgres:14

@@ -1,11 +1,11 @@
-FROM rust:bullseye
+FROM rust:trixie
 
 # Dependencies
 COPY --from=sclevine/yj /bin/yj /bin/yj
 RUN /bin/yj -h
 RUN apt-get update -y \
     && apt-get install -y \
-    llvm-11 psmisc postgresql-contrib postgresql-client \
+    wget llvm-19 psmisc postgresql-contrib postgresql-client \
     ruby ruby-dev libpq-dev python3 python3-pip lcov curl sudo iproute2 \
     strace ngrep iproute2 dnsutils lsof net-tools telnet
 

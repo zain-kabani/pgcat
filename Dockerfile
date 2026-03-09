@@ -1,22 +1,39 @@
-FROM rust:1.81.0-slim-bookworm AS builder
+FROM rust:1.88.0-slim-trixie AS builder
 
 RUN apt-get update && \
-    apt-get install -y build-essential
+    apt-get install -y --no-install-recommends build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-COPY . /app
 WORKDIR /app
+
+# Cache Rust dependencies separately,
+# avoiding rebuilding the layer on every source code change
+COPY Cargo.toml Cargo.lock ./
+RUN cargo fetch
+
+COPY . .
 RUN cargo build --release
 
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install  -o Dpkg::Options::=--force-confdef -yq --no-install-recommends \
-    postgresql-client \
-    # Clean up layer
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-    && truncate -s 0 /var/log/*log
-COPY --from=builder /app/target/release/pgcat /usr/bin/pgcat
-COPY --from=builder /app/pgcat.toml /etc/pgcat/pgcat.toml
+################################################################################
+
+FROM debian:trixie-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends postgresql-client && \
+    groupadd --system --gid 1001 appgroup && \
+    useradd --system --uid 1001 --gid appgroup appuser && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    truncate -s 0 /var/log/*log
+
 WORKDIR /etc/pgcat
+RUN chown appuser:appgroup /etc/pgcat
+
+USER appuser
+
+COPY --from=builder --chown=appuser:appgroup /app/target/release/pgcat /usr/bin/pgcat
+COPY --from=builder --chown=appuser:appgroup /app/pgcat.toml /etc/pgcat/pgcat.toml
+
 ENV RUST_LOG=info
 CMD ["pgcat"]
 STOPSIGNAL SIGINT

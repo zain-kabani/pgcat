@@ -5,8 +5,8 @@ export HOST_UID="$(id -u)"
 export HOST_GID="$(id -g)"
 
 if [[ "${1}" == "down" ]]; then
-	docker-compose -f "${DIR}/../docker-compose.yaml" down
+	docker compose -f "${DIR}/../docker-compose.yaml" down
 	exit 0
 else
-	docker-compose -f "${DIR}/../docker-compose.yaml" run --rm pgcat-shell
+	docker compose -f "${DIR}/../docker-compose.yaml" run --rm pgcat-shell
 fi
