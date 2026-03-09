@@ -1,15 +1,5 @@
-.idea
 /target
-*.deb
+.idea
 .vscode
 *.profraw
-cov/
-lcov.info
-
-# Dev
-dev/.bash_history
-dev/cache
-!dev/cache/.keepme
-.venv
-**/__pycache__
-.bundle
+*.deb

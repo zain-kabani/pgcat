@@ -161,9 +161,8 @@ impl Sharder {
 mod test {
     use super::*;
 
-    // See tests/sharding/partition_hash_test_setup.sql
-    // The output of those SELECT statements will match this test,
-    // confirming that we implemented Postgres BIGINT hashing correctly.
+    // Confirms that we implemented Postgres BIGINT hashing correctly
+    // (matches the output of `SELECT satisfies_hash_partition(...)`).
     #[test]
     fn test_pg_bigint_hash() {
         let sharder = Sharder::new(5, ShardingFunction::PgBigintHash);
